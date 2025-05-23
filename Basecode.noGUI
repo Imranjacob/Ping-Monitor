@@ -4,180 +4,93 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PingMonitor {
 
-    private static final String SERVER_IP = "192.168.10.246";
-    private static final String SERVER_IP2 ="10.1.5.19";
-    private static final String SERVER_IP3 ="10.1.5.150";
-    private static final String SERVER_IP4 ="10.1.5.106";
-    private static final String SERVER_IP5 ="10.1.5.17";
-    private static final String SERVER_IP6 ="10.1.5.11";
-    private static final String TELEGRAM_BOT_TOKEN = ""; // Replace with your bot token
-    private static final String CHAT_ID = ""; // Replace with your chat ID
+    private static final String TELEGRAM_BOT_TOKEN = "here"; // Replace with your bot token
+    private static final String CHAT_ID = "-here"; // Replace with your chat ID
+    private static final String IP_FILE_PATH = "here"; //insert path to ip.txt
     private static int lastUpdateId = 0;
+
+    private static List<String> ipAddresses = new ArrayList<>();
+    private static List<Boolean> serverStatus = new ArrayList<>();
+    private static List<Integer> failureCount = new ArrayList<>();
 
     public static void main(String[] args) {
 
-        boolean isMessageSent = false;
-        boolean SSMessage = false;
-        boolean isMessageSent2 = false;
-        boolean SSMessage2 = false;
-        boolean isMessageSent3 = false;
-        boolean SSMessage3 = false;
-        boolean isMessageSent4 = false;
-        boolean SSMessage4 = false;
-        boolean isMessageSent5 = false;
-        boolean SSMessage5 = false;
-        boolean isMessageSent6 = false;
-        boolean SSMessage6 = false;
+        // Load IPs from file
+        ipAddresses = loadIPAddressesFromFile(IP_FILE_PATH);
+        for (String ip : ipAddresses) {
+            serverStatus.add(true);
+            failureCount.add(0);
+        }
+
+        if (ipAddresses.isEmpty()) {
+            sendTelegramMessage(" No IP addresses found in the file.");
+            return;
+        }
+
+        sendTelegramMessage(" Monitoring system started. Checking " + ipAddresses.size() + " IP(s).");
 
         while (true) {
-            if (pingServer(SERVER_IP)) { //server 1
-                if (!SSMessage) {
-                    sendTelegramMessage("Ping Successful " + SERVER_IP);
-                    SSMessage = true;
+            for (int i = 0; i < ipAddresses.size(); i++) {
+                String ip = ipAddresses.get(i);
+                boolean isReachable = pingServer(ip);
 
-                }
-                isMessageSent = false;
-            } else {
-                if (!isMessageSent) {
-                    sendTelegramMessage("Ping Server Failure " + SERVER_IP);
-                }
-                SSMessage = false;
-            }
-
-
-           try {
-               Thread.sleep(5000);
-           } catch (InterruptedException e) {
-              e.printStackTrace();
-           }
-
-                if (pingServer(SERVER_IP2)) {  //Server 2
-                    if (!SSMessage2) {
-                        sendTelegramMessage("Ping Successful " + SERVER_IP2);
-                        SSMessage2 = true;
-
+                if (isReachable) {
+                    if (!serverStatus.get(i)) {
+                        sendTelegramMessage(" Ping Success: " + ip);
+                        serverStatus.set(i, true);
+                        failureCount.set(i, 0);
                     }
-                    isMessageSent2 = false;
                 } else {
-                    if (!isMessageSent2) {
-                        sendTelegramMessage("Ping Server Failure " + SERVER_IP2);
+                    failureCount.set(i, failureCount.get(i) + 1);
+
+                    if (serverStatus.get(i)) {
+                        sendTelegramMessage(" Ping Failure: " + ip);
+                        serverStatus.set(i, false);
                     }
-                    SSMessage2 = false;
                 }
 
-
-               try {
-                    Thread.sleep(5000);
+                try {
+                    Thread.sleep(2000); // Wait 5 sec between each ping
                 } catch (InterruptedException e) {
-                   e.printStackTrace();
+                    e.printStackTrace();
                 }
-
-            if (pingServer(SERVER_IP3)) {  //server 3
-                if (!SSMessage3) {
-                    sendTelegramMessage("Ping Successful " + SERVER_IP3);
-                    SSMessage3 = true;
-
-                }
-                isMessageSent3 = false;
-            } else {
-                if (!isMessageSent3) {
-                    sendTelegramMessage("Ping Server Failure " + SERVER_IP3);
-                }
-                SSMessage3 = false;
-            }
-
-
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            if (pingServer(SERVER_IP4)) {  //server 4
-                if (!SSMessage4) {
-                    sendTelegramMessage("Ping Successful " + SERVER_IP4);
-                    SSMessage4 = true;
-
-                }
-                isMessageSent4 = false;
-            } else {
-                if (!isMessageSent4) {
-                    sendTelegramMessage("Ping Server Failure " + SERVER_IP4);
-                }
-                SSMessage4 = false;
-            }
-
-
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            if (pingServer(SERVER_IP5)) {  //server 5
-                if (!SSMessage5) {
-                    sendTelegramMessage("Ping Successful " + SERVER_IP5);
-                    SSMessage5 = true;
-
-                }
-                isMessageSent5 = false;
-            } else {
-                if (!isMessageSent5) {
-                    sendTelegramMessage("Ping Server Failure " + SERVER_IP5);
-                }
-                SSMessage5 = false;
-            }
-
-
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            if (pingServer(SERVER_IP6)) {  //server 5
-                if (!SSMessage6) {
-                    sendTelegramMessage("Ping Successful " + SERVER_IP6);
-                    SSMessage6 = true;
-
-                }
-                isMessageSent6 = false;
-            } else {
-                if (!isMessageSent6) {
-                    sendTelegramMessage("Ping Server Failure " + SERVER_IP6);
-                }
-                SSMessage6 = false;
             }
 
             checkTelegramUpdates();
 
             try {
-                Thread.sleep(5000);
+                Thread.sleep(3000); // Wait before next round
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
-
-            }
         }
+    }
 
-
-
-
-        private static boolean pingServer (String ipAddress){
-            try {
-                InetAddress address = InetAddress.getByName(ipAddress);
-                return address.isReachable(1000); // Timeout of 1 second
-            } catch (Exception e) {
-                return false;
-            }
+    private static List<String> loadIPAddressesFromFile(String filePath) {
+        try {
+            return Files.readAllLines(Paths.get(filePath));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return List.of();
         }
+    }
 
+    private static boolean pingServer(String ipAddress) {
+        try {
+            InetAddress address = InetAddress.getByName(ipAddress);
+            return address.isReachable(1000);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     private static void sendTelegramMessage(String message) {
         try {
@@ -193,7 +106,7 @@ public class PingMonitor {
                 os.flush();
             }
 
-            conn.getResponseCode(); // To execute the request
+            conn.getResponseCode();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -205,16 +118,14 @@ public class PingMonitor {
             URL url = new URL(urlString);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-            conn.setDoOutput(true);
 
             try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-                String inputLine;
                 StringBuilder response = new StringBuilder();
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
                 }
-                String updates = response.toString();
-                processUpdates(updates);
+                processUpdates(response.toString());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -222,21 +133,72 @@ public class PingMonitor {
     }
 
     private static void processUpdates(String updates) {
-        // Parse the updates string to find incoming messages
         if (updates.contains("\"update_id\":")) {
             String[] parts = updates.split("\"update_id\":");
             for (int i = 1; i < parts.length; i++) {
                 String updateIdStr = parts[i].split(",")[0].trim();
                 int updateId = Integer.parseInt(updateIdStr);
                 if (updateId > lastUpdateId) {
-                    lastUpdateId = updateId; // Update last update ID
-                    String messageText = parts[i].split("\"text\":\"")[1].split("\"")[0]; // Extracting the message text
+                    lastUpdateId = updateId;
+
+                    String messageBlock = parts[i];
+                    if (!messageBlock.contains("\"chat\":{\"id\":" + CHAT_ID)) {
+                        continue; // Reject unknown users
+                    }
+
+                    String[] splitText = messageBlock.split("\"text\":\"");
+                    if (splitText.length < 2) continue;
+
+                    String messageText = splitText[1].split("\"")[0].trim();
+
                     if (messageText.equalsIgnoreCase("status")) {
-                        sendTelegramMessage("The Ping Monitor is running.");
+                        sendTelegramMessage(" Ping Monitor is running. Monitoring " + ipAddresses.size() + " IP(s).");
+                    } else if (messageText.equalsIgnoreCase("list")) {
+                        if (ipAddresses.isEmpty()) {
+                            sendTelegramMessage(" No IPs currently monitored.");
+                        } else {
+                            StringBuilder sb = new StringBuilder(" Monitored IPs:\n");
+                            for (String ip : ipAddresses) {
+                                sb.append("- ").append(ip).append("\n");
+                            }
+                            sendTelegramMessage(sb.toString());
+                        }
+                    } else if (messageText.toLowerCase().startsWith("add ")) {
+                        String ipToAdd = messageText.substring(4).trim();
+                        if (!ipAddresses.contains(ipToAdd)) {
+                            ipAddresses.add(ipToAdd);
+                            serverStatus.add(true);
+                            failureCount.add(0);
+                            try {
+                                Files.write(Paths.get(IP_FILE_PATH), (ipToAdd + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
+                                sendTelegramMessage(" IP added: " + ipToAdd);
+                            } catch (Exception e) {
+                                sendTelegramMessage(" Failed to save IP: " + ipToAdd);
+                            }
+                        } else {
+                            sendTelegramMessage(" IP already exists: " + ipToAdd);
+                        }
+                    } else if (messageText.toLowerCase().startsWith("remove ")) {
+                        String ipToRemove = messageText.substring(7).trim();
+                        int index = ipAddresses.indexOf(ipToRemove);
+                        if (index != -1) {
+                            ipAddresses.remove(index);
+                            serverStatus.remove(index);
+                            failureCount.remove(index);
+                            try {
+                                Files.write(Paths.get(IP_FILE_PATH), ipAddresses, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+                                sendTelegramMessage(" IP removed: " + ipToRemove);
+                            } catch (Exception e) {
+                                sendTelegramMessage(" Failed to update IP file.");
+                            }
+                        } else {
+                            sendTelegramMessage(" IP not found: " + ipToRemove);
+                        }
+                    } else {
+                        sendTelegramMessage(" Unknown command.\nUse:\n- status\n- list\n- add <ip>\n- remove <ip>");
                     }
                 }
             }
         }
     }
-
 }
